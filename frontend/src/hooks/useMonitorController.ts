@@ -1,0 +1,139 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { InboundEvent, QuestionType } from "@/lib/types";
+import { nowSeconds } from "@/lib/utils";
+import {
+  startSimulation,
+  type SimulationHandle,
+  type SimulationProfile,
+} from "@/lib/simulation";
+import { useActivityEvents } from "./useActivityEvents";
+import { useFaceLandmarker } from "./useFaceLandmarker";
+import { useMediaCapture } from "./useMediaCapture";
+import { useMonitorSocket } from "./useMonitorSocket";
+import { useSpeechTranscription } from "./useSpeechTranscription";
+
+export type MonitorMode = "idle" | "live" | "simulation";
+
+function makeSessionId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `sess-${crypto.randomUUID().slice(0, 8)}`;
+  }
+  return `sess-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Top-level orchestrator: owns the session, wires every capture hook to the
+ * WebSocket sink, and can swap in the deterministic simulation instead of live
+ * capture. This is the single seam the monitoring console talks to.
+ */
+export function useMonitorController() {
+  const [sessionId] = useState(makeSessionId);
+  const [mode, setMode] = useState<MonitorMode>("idle");
+
+  const capture = useMediaCapture();
+  const simRef = useRef<SimulationHandle | null>(null);
+
+  const socket = useMonitorSocket({
+    sessionId,
+    enabled: mode !== "idle",
+  });
+  const sendRef = useRef(socket.send);
+  sendRef.current = socket.send;
+
+  const emit = useCallback((event: InboundEvent) => {
+    sendRef.current(event);
+  }, []);
+
+  const live = mode === "live";
+
+  // Live capture pipelines (only active in live mode).
+  const face = useFaceLandmarker({
+    stream: capture.streams.cameraStream,
+    enabled: live,
+    emit,
+  });
+  const speech = useSpeechTranscription({
+    micStream: capture.streams.micStream,
+    displayStream: capture.streams.displayStream,
+    enabled: live,
+    emit,
+  });
+  useActivityEvents(emit, live);
+
+  const startLive = useCallback(async () => {
+    const okCam = await capture.requestCameraAndMic();
+    // Screen capture is optional but recommended; don't block if declined.
+    await capture.requestDisplay().catch(() => false);
+    if (!okCam) return false;
+    emit({ type: "control", action: "reset" });
+    emit({ type: "control", action: "start" });
+    setMode("live");
+    return true;
+  }, [capture, emit]);
+
+  const startSimulationMode = useCallback(
+    (profile: SimulationProfile) => {
+      setMode("simulation");
+      // Delay so the socket is connected before the burst begins.
+      window.setTimeout(() => {
+        simRef.current?.stop();
+        simRef.current = startSimulation(emit, profile);
+      }, 350);
+    },
+    [emit],
+  );
+
+  const stop = useCallback(() => {
+    simRef.current?.stop();
+    simRef.current = null;
+    capture.stopAll();
+    emit({ type: "control", action: "stop" });
+    setMode("idle");
+  }, [capture, emit]);
+
+  const tagQuestion = useCallback(
+    (question_type: QuestionType) => {
+      emit({ type: "question", ts: nowSeconds(), question_type });
+    },
+    [emit],
+  );
+
+  useEffect(() => {
+    return () => {
+      simRef.current?.stop();
+    };
+  }, []);
+
+  return useMemo(
+    () => ({
+      sessionId,
+      mode,
+      connection: socket.status,
+      state: socket.state,
+      capture,
+      face,
+      speech,
+      startLive,
+      startSimulationMode,
+      stop,
+      tagQuestion,
+    }),
+    [
+      sessionId,
+      mode,
+      socket.status,
+      socket.state,
+      capture,
+      face,
+      speech,
+      startLive,
+      startSimulationMode,
+      stop,
+      tagQuestion,
+    ],
+  );
+}
+
+export type MonitorController = ReturnType<typeof useMonitorController>;
