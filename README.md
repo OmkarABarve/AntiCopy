@@ -17,13 +17,64 @@ makes the final decision.**
 
 ---
 
+## Get started
+
+**Needs:** Node.js 20+, Python 3.12+, npm.
+
+### 1. First-time setup (once)
+
+```bash
+# Backend
+cd backend
+python -m venv .venv
+
+# Windows PowerShell:
+.\.venv\Scripts\Activate.ps1
+# macOS / Linux:
+# source .venv/bin/activate
+
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm   # optional but recommended
+cd ..
+
+# Frontend + root (concurrently)
+npm run install:all
+```
+
+### 2. Run everything
+
+From the **repo root**:
+
+```bash
+npm run dev
+```
+
+That starts backend + frontend together:
+
+| App | URL |
+|-----|-----|
+| Frontend | http://localhost:3000 |
+| Backend health | http://127.0.0.1:8000/health |
+| API docs | http://127.0.0.1:8000/docs |
+
+Open http://localhost:3000 and click **Demo: AI-Assisted** or **Demo: Human** for an instant walkthrough (no Meet required). Ctrl+C stops both servers.
+
+After the first setup, day-to-day is just:
+
+```bash
+# activate backend/.venv if you need to reinstall Python deps, then:
+npm run dev
+```
+
+---
+
 ## Table of contents
 
 - [How it works](#how-it-works)
 - [Architecture](#architecture)
 - [Tech stack](#tech-stack)
 - [Repository layout](#repository-layout)
-- [Quick start](#quick-start)
+- [Quick start (details)](#quick-start-details)
 - [Running the demo](#running-the-demo)
 - [The explainable risk engine](#the-explainable-risk-engine)
 - [Feature modules](#feature-modules)
@@ -108,54 +159,21 @@ AntiCopy/
 │   │   └── detectors/         # Positive + human-like signal detectors
 │   ├── scripts/ws_smoke.py    # End-to-end WebSocket smoke test
 │   └── requirements.txt
-└── frontend/
-    └── src/
-        ├── app/               # Next.js routes: / (console) and /dashboard (reviewer)
-        ├── components/        # UI primitives + dashboard sections
-        ├── hooks/             # Capture, vision, speech, activity, socket, controller
-        └── lib/               # Types, config, simulation, helpers
+├── frontend/
+│   └── src/
+├── package.json               # npm run dev → backend + frontend together
+└── scripts/run-backend.mjs
 ```
 
 ---
 
-## Quick start
+## Quick start (details)
 
 ### Prerequisites
 - Node.js 20+ and npm
 - Python 3.12 (3.11+ works)
 - A Chromium browser (Chrome/Edge) for live capture (Web Speech API + screen/tab
   audio). The **simulation** demo works in any modern browser.
-
-### One-command dev (recommended)
-
-First-time setup (backend venv + deps, then root + frontend npm):
-
-```bash
-# Backend (once)
-cd backend
-python -m venv .venv
-# Windows PowerShell:
-.\.venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm   # NLP model (recommended)
-cd ..
-
-# Install root + frontend deps (once)
-npm run install:all
-```
-
-Then from the **repo root** start both servers together:
-
-```bash
-npm run dev
-```
-
-- Frontend: http://localhost:3000  
-- Backend:  http://127.0.0.1:8000  (health: `/health`, docs: `/docs`)
-
-This runs FastAPI (uvicorn with reload) and Next.js side by side via
-`concurrently`. Ctrl+C stops both.
 
 ### Run separately (optional)
 
