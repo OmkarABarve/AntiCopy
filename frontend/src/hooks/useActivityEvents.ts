@@ -15,7 +15,9 @@ export function useActivityEvents(emit: Emit, enabled: boolean) {
   const lastMouse = useRef(0);
   const lastKey = useRef(0);
   const emitRef = useRef(emit);
-  emitRef.current = emit;
+  useEffect(() => {
+    emitRef.current = emit;
+  }, [emit]);
 
   useEffect(() => {
     if (!enabled) return;

@@ -38,6 +38,7 @@ export type ActivityKind =
 export interface GazeEvent {
   type: "gaze";
   ts: number;
+  face_visible?: boolean;
   on_screen: boolean;
   blink: boolean;
   ear?: number | null;

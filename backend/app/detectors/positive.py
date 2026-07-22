@@ -100,14 +100,48 @@ class GazeReadingDetector:
                     weight=0.45,
                     confidence=combined * data,
                     explanation=(
-                        f"Attention is off the camera {off_screen:.0f}% of the time, "
-                        "often toward a fixed region. Could indicate a second screen - "
-                        "or simply notes; corroborate with conversation signals."
+                        f"On the Meet video, attention is off the candidate's "
+                        f"forward-facing region {off_screen:.0f}% of the time, "
+                        "often toward a fixed region. Could indicate a second "
+                        "screen or notes; corroborate with conversation signals."
                     ),
                     detector=self.name,
                 )
             )
         return out
+
+
+@register_detector
+class DownwardGazeDetector:
+    name = "downward_gaze"
+
+    def evaluate(self, features: FeatureSnapshot) -> list[Signal]:
+        v = features.values
+        samples = v.get("gaze_samples", 0.0)
+        visible_pct = v.get("gaze_face_visible_pct", 0.0)
+        # Only trust this when we actually saw the candidate's face enough.
+        data = ramp(samples, 60, 300) * ramp(visible_pct, 30, 70)
+
+        down_pct = v.get("gaze_down_pct", 0.0)
+        sustained = v.get("gaze_down_sustained_s", 0.0)
+        strength = max(ramp(down_pct, 25, 60), 0.7 * ramp(sustained, 3, 10))
+        if strength * data < 0.15:
+            return []
+        return [
+            _mk(
+                "downward_gaze",
+                "Sustained downward gaze",
+                weight=0.45,  # low - eye tracking is supporting-only evidence
+                confidence=strength * data,
+                explanation=(
+                    f"On the Meet video the candidate looks downward {down_pct:.0f}% of "
+                    f"the time (longest stretch ~{sustained:.0f}s), consistent with "
+                    "reading notes or a second screen. Supporting evidence only - "
+                    "corroborate with conversation signals."
+                ),
+                detector=self.name,
+            )
+        ]
 
 
 @register_detector

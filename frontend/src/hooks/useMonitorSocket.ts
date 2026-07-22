@@ -32,7 +32,9 @@ export function useMonitorSocket({
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onStateRef = useRef(onState);
-  onStateRef.current = onState;
+  useEffect(() => {
+    onStateRef.current = onState;
+  }, [onState]);
 
   const flush = useCallback(() => {
     const ws = wsRef.current;

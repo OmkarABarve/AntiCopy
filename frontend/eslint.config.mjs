@@ -13,6 +13,17 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      // The following are new, experimental React Compiler-aligned rules that
+      // produce false positives on legitimate, correct patterns we rely on:
+      //   - updating a subscription/connection status via setState in an effect
+      //   - custom hooks that return a status object alongside a callback ref
+      // We keep them as warnings (still surfaced) rather than hard errors.
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/refs": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;

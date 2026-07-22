@@ -1,7 +1,9 @@
 """Gaze / eye features derived from browser-sent MediaPipe samples.
 
-Off-screen attention, fixation duration, blink frequency and a reading-scan
-score (rhythmic left->right sweeps with left resets, like reading text).
+Gaze is computed on the candidate's Google Meet video (tab capture). Features:
+off-screen attention, downward attention (reading notes / second screen),
+fixation duration, blink frequency and a reading-scan score (rhythmic
+left->right sweeps with left resets, like reading text).
 
 Eye tracking must NEVER be the sole evidence, so these features are weighted
 modestly in the risk engine and always paired with counter-evidence.
@@ -15,6 +17,9 @@ from .base import register_extractor, safe_mean, safe_std
 
 HEATMAP_COLS = 12
 HEATMAP_ROWS = 8
+
+# gaze_y is down-positive; above this the candidate is looking clearly downward.
+DOWN_THRESHOLD = 0.35
 
 
 @register_extractor
@@ -45,9 +50,20 @@ class GazeExtractor:
         mean_gx = safe_mean(gx)
         fixed_region = min(1.0, abs(mean_gx)) * (1.0 - min(1.0, safe_std(gx)))
 
+        # Downward attention (reading notes / a second screen below the camera),
+        # measured only over frames where the candidate's face was detected.
+        visible = [f for f in frames if getattr(f, "face_visible", True)]
+        face_visible_pct = 100.0 * len(visible) / n
+        down = sum(1 for f in visible if f.gaze_y > DOWN_THRESHOLD)
+        gaze_down_pct = 100.0 * down / len(visible) if visible else 0.0
+        gaze_down_sustained_s = self._max_downward_run(frames)
+
         return {
             "gaze_off_screen_pct": round(off_screen_pct, 1),
             "gaze_on_screen_pct": round(100.0 - off_screen_pct, 1),
+            "gaze_down_pct": round(gaze_down_pct, 1),
+            "gaze_down_sustained_s": round(gaze_down_sustained_s, 2),
+            "gaze_face_visible_pct": round(face_visible_pct, 1),
             "blink_per_min": round(blink_per_min, 1),
             "blink_count": float(blinks),
             "gaze_fixation_mean_s": round(fixation, 2),
@@ -57,6 +73,20 @@ class GazeExtractor:
             "gaze_vertical_std": round(safe_std(gy), 3),
             "gaze_samples": float(n),
         }
+
+    def _max_downward_run(self, frames: list[GazeEvent]) -> float:
+        """Longest continuous stretch (seconds) of face-visible downward gaze."""
+        best = 0.0
+        run_start: float | None = None
+        for f in frames:
+            downward = getattr(f, "face_visible", True) and f.gaze_y > DOWN_THRESHOLD
+            if downward:
+                if run_start is None:
+                    run_start = f.ts
+                best = max(best, f.ts - run_start)
+            else:
+                run_start = None
+        return best
 
     def _fixation_duration(self, frames: list[GazeEvent]) -> float:
         """Mean duration (s) that gaze stays within a small movement threshold."""
@@ -96,6 +126,9 @@ class GazeExtractor:
         return [
             "gaze_off_screen_pct",
             "gaze_on_screen_pct",
+            "gaze_down_pct",
+            "gaze_down_sustained_s",
+            "gaze_face_visible_pct",
             "blink_per_min",
             "blink_count",
             "gaze_fixation_mean_s",

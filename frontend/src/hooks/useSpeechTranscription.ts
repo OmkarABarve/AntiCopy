@@ -79,7 +79,9 @@ export function useSpeechTranscription({
   emit,
 }: Options) {
   const emitRef = useRef(emit);
-  emitRef.current = emit;
+  useEffect(() => {
+    emitRef.current = emit;
+  }, [emit]);
 
   const [status, setStatus] = useState<TranscriptionStatus>({
     supported: true,

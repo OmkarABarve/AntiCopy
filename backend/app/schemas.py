@@ -68,10 +68,12 @@ class TranscriptEvent(BaseModel):
 
 
 class GazeEvent(BaseModel):
-    """A single (already aggregated) gaze/eye sample from MediaPipe."""
+    """A single (already aggregated) gaze/eye sample from MediaPipe, computed on
+    the candidate's Google Meet video (tab capture)."""
 
     type: Literal["gaze"] = "gaze"
     ts: float
+    face_visible: bool = True  # whether a candidate face was detected this frame
     on_screen: bool = True
     blink: bool = False
     ear: Optional[float] = None  # eye aspect ratio

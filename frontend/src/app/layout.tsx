@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sentinel · Passive Interview Integrity Monitor",
+  title: "AntiCopy · Passive Interview Integrity Monitor",
   description:
     "Explainable, never-accusatory estimation of real-time AI interview assistance. An AI-assisted reviewer, not an AI judge.",
 };

@@ -40,7 +40,9 @@ export function useMonitorController() {
     enabled: mode !== "idle",
   });
   const sendRef = useRef(socket.send);
-  sendRef.current = socket.send;
+  useEffect(() => {
+    sendRef.current = socket.send;
+  }, [socket.send]);
 
   const emit = useCallback((event: InboundEvent) => {
     sendRef.current(event);
@@ -49,8 +51,10 @@ export function useMonitorController() {
   const live = mode === "live";
 
   // Live capture pipelines (only active in live mode).
+  // Gaze runs on the candidate's Google Meet video from getDisplayMedia (tab
+  // capture), NOT the interviewer's local webcam - this is a remote interview.
   const face = useFaceLandmarker({
-    stream: capture.streams.cameraStream,
+    stream: capture.streams.displayStream,
     enabled: live,
     emit,
   });
@@ -63,10 +67,18 @@ export function useMonitorController() {
   useActivityEvents(emit, live);
 
   const startLive = useCallback(async () => {
-    const okCam = await capture.requestCameraAndMic();
-    // Screen capture is optional but recommended; don't block if declined.
-    await capture.requestDisplay().catch(() => false);
-    if (!okCam) return false;
+    // Mic is required for interviewer speech attribution; Meet tab (display)
+    // is required for candidate gaze on the remote video. Local webcam is
+    // intentionally not used for gaze in a remote interview.
+    const okMic = await capture.requestMic();
+    if (!okMic) return false;
+    const okDisplay = await capture.requestDisplay();
+    if (!okDisplay) {
+      // Without Meet tab video we cannot run candidate gaze. Stop mic and
+      // surface the failure rather than starting a half-broken live session.
+      capture.stopAll();
+      return false;
+    }
     emit({ type: "control", action: "reset" });
     emit({ type: "control", action: "start" });
     setMode("live");

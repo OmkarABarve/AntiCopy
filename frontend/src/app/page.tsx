@@ -47,7 +47,7 @@ export default function Home() {
       </div>
 
       <footer className="mt-10 border-t border-border/50 pt-4 text-center text-[11px] text-muted-foreground">
-        Sentinel estimates probability from behaviour; it never accuses and is not
+        AntiCopy estimates probability from behaviour; it never accuses and is not
         proof of misconduct. Designed to minimise false positives - every
         suspicious signal can be offset by human-like evidence.
       </footer>

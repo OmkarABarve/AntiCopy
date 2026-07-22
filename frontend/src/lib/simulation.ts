@@ -222,20 +222,21 @@ function buildGaze(
     let gaze_x: number;
     let gaze_y: number;
     let on_screen: boolean;
-    let blink = i % Math.floor(hz * (profile === "ai_assisted" ? 6 : 3.5)) === 0;
+    const blink = i % Math.floor(hz * (profile === "ai_assisted" ? 6 : 3.5)) === 0;
 
     if (profile === "ai_assisted") {
-      // Reading-like: rhythmic left->right sweep with resets, held off-center.
+      // Reading-like: rhythmic left->right sweep with resets, held off-center,
+      // and gaze biased downward as if reading notes below the camera.
       const phase = (i % (hz * 2)) / (hz * 2); // 2s reading cycle
       gaze_x = 0.15 + phase * 0.55; // sweep rightward
       if (phase > 0.92) gaze_x = 0.1; // line reset
-      gaze_y = 0.25 + Math.sin(i / 6) * 0.05;
-      on_screen = gaze_x < 0.45;
+      gaze_y = 0.45 + Math.sin(i / 6) * 0.06; // sustained downward attention
+      on_screen = gaze_x < 0.45 && gaze_y < 0.35;
     } else {
       // Natural: centered gaze with organic jitter, mostly on-camera.
       gaze_x = Math.sin(i / 9) * 0.18 + (Math.random() - 0.5) * 0.12;
       gaze_y = Math.cos(i / 11) * 0.12 + (Math.random() - 0.5) * 0.1;
-      on_screen = Math.abs(gaze_x) < 0.5 && Math.abs(gaze_y) < 0.5;
+      on_screen = Math.abs(gaze_x) < 0.5 && gaze_y < 0.35;
     }
 
     out.push({
@@ -243,6 +244,7 @@ function buildGaze(
       event: {
         type: "gaze",
         ts: base + st,
+        face_visible: true,
         on_screen,
         blink,
         gaze_x: Number(gaze_x.toFixed(3)),

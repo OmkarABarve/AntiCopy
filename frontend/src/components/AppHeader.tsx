@@ -8,7 +8,7 @@ export function AppHeader({ subtitle }: { subtitle?: string }) {
       </div>
       <div>
         <h1 className="text-xl font-semibold tracking-tight">
-          <span className="text-gradient">Sentinel</span>{" "}
+          <span className="text-gradient">AntiCopy</span>{" "}
           <span className="text-muted-foreground">· Interview Integrity Monitor</span>
         </h1>
         <p className="text-xs text-muted-foreground">

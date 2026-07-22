@@ -53,7 +53,7 @@ export function EyeHeatmap({
           </div>
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="rounded border border-border/50 px-2 py-0.5 text-[9px] uppercase tracking-widest text-muted-foreground/70">
-              camera view
+              Meet candidate view
             </div>
           </div>
         </div>

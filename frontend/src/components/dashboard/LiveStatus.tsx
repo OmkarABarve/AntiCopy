@@ -64,6 +64,7 @@ export function LiveStatus({
         <Stat label="Overall WPM" value={Math.round(v.wpm_overall ?? 0)} />
         <Stat label="Avg latency" value={(v.response_latency_mean ?? 0).toFixed(1)} unit="s" />
         <Stat label="Off-screen" value={Math.round(v.gaze_off_screen_pct ?? 0)} unit="%" />
+        <Stat label="Looking down" value={Math.round(v.gaze_down_pct ?? 0)} unit="%" />
         <Stat
           label="Data collected"
           value={Math.round((state?.data_sufficiency ?? 0) * 100)}

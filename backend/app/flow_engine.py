@@ -59,6 +59,13 @@ SIGNAL_RULES: list[tuple[str, QuestionType, str]] = [
         "answer and rewards personal reasoning.",
     ),
     (
+        "downward_gaze",
+        QuestionType.opinion,
+        "Candidate frequently looks down (possibly reading notes). Ask an opinion "
+        "question with no lookup-able answer, and watch whether the downward glancing "
+        "stops.",
+    ),
+    (
         "generic_ownership",
         QuestionType.resume_ownership,
         "Answers are generic. Ask a resume-ownership question demanding specific "

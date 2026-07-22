@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,9 +37,20 @@ from .schemas import (
 )
 from .session import registry
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Warm the spaCy model in a background thread so the first analysis request
+    # isn't delayed by lazy model loading.
+    from .extractors.nlp import get_nlp
+
+    asyncio.get_event_loop().run_in_executor(None, get_nlp)
+    yield
+
+
 app = FastAPI(
     title="Invisible AI Cheater - Passive Interview Monitor",
     version=__version__,
+    lifespan=lifespan,
     description=(
         "Passive, browser-only behavioural monitoring that estimates the "
         "probability of real-time AI interview assistance. Explainable, "

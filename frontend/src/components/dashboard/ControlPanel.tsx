@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import type { MonitorController } from "@/hooks/useMonitorController";
 import type { PermissionState } from "@/hooks/useMediaCapture";
 import {
-  Camera,
   Mic,
   MonitorSmartphone,
   Play,
@@ -38,6 +37,9 @@ export function ControlPanel({ controller }: { controller: MonitorController }) 
   const { mode, capture, face, speech, startLive, startSimulationMode, stop } =
     controller;
   const running = mode !== "idle";
+  const meetShared =
+    capture.permissions.display === "granted" &&
+    (capture.streams.displayStream?.getVideoTracks().length ?? 0) > 0;
 
   return (
     <Card>
@@ -47,10 +49,9 @@ export function ControlPanel({ controller }: { controller: MonitorController }) 
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <PermChip icon={Mic} label="Mic" state={capture.permissions.mic} />
-          <PermChip icon={Camera} label="Camera" state={capture.permissions.camera} />
           <PermChip
             icon={MonitorSmartphone}
-            label="Screen"
+            label="Meet tab"
             state={capture.permissions.display}
           />
         </div>
@@ -86,30 +87,49 @@ export function ControlPanel({ controller }: { controller: MonitorController }) 
           </a>
         </div>
 
+        {capture.error && mode === "idle" && (
+          <p className="text-[11px] font-medium text-[var(--risk-high)]">
+            {capture.error}. Live monitoring needs your microphone and a shared
+            Google Meet tab (with &quot;Also share tab audio&quot;).
+          </p>
+        )}
+
         {mode === "live" && (
           <div className="flex flex-wrap items-start gap-4">
             <div className="relative overflow-hidden rounded-md border border-border/60">
-              {/* Hidden-ish camera preview feeding MediaPipe */}
+              {/* Preview of Meet tab video feeding MediaPipe (analysis also
+                  runs on an internal hidden video). */}
               <video
-                ref={face.videoRef}
+                ref={face.registerVideo}
                 muted
                 playsInline
-                className="h-24 w-32 -scale-x-100 object-cover"
+                className="h-24 w-40 bg-black object-cover"
               />
               <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[9px] text-white">
-                gaze input
+                Meet gaze video
               </span>
             </div>
             <div className="space-y-1 text-[11px] text-muted-foreground">
+              {!meetShared && (
+                <div className="font-medium text-[var(--risk-high)]">
+                  Meet tab not shared - candidate gaze is disabled. Share the
+                  Google Meet tab (with &quot;Also share tab audio&quot;) to
+                  enable it.
+                </div>
+              )}
               <div>
-                Face model:{" "}
-                {face.status.ready
-                  ? face.status.faceVisible
-                    ? "tracking face"
-                    : "no face detected"
-                  : face.status.loading
-                    ? "loading…"
-                    : face.status.error ?? "idle"}
+                Candidate gaze (Meet video):{" "}
+                {!meetShared || !face.status.hasVideo
+                  ? "blocked - share the Meet tab"
+                  : face.status.ready
+                    ? face.status.faceVisible
+                      ? face.status.lastGaze && face.status.lastGaze.gaze_y > 0.35
+                        ? "tracking · looking down"
+                        : "tracking candidate face"
+                      : "no face detected - pin/spotlight the candidate"
+                    : face.status.loading
+                      ? "loading model…"
+                      : face.status.error ?? "idle"}
               </div>
               <div>
                 Speech:{" "}
@@ -120,8 +140,9 @@ export function ControlPanel({ controller }: { controller: MonitorController }) 
                   : "not supported (use Chrome/Edge or Demo mode)"}
               </div>
               <div>
-                To transcribe candidate audio, share the Google Meet tab with
-                &quot;Also share tab audio&quot; enabled.
+                Tip: pin or spotlight the candidate in Meet so their face is the
+                largest tile, and enable &quot;Also share tab audio&quot; for
+                candidate transcription. Gaze uses the Meet tab, not your webcam.
               </div>
             </div>
           </div>
@@ -131,6 +152,7 @@ export function ControlPanel({ controller }: { controller: MonitorController }) 
           <p className="text-[11px] text-muted-foreground">
             Running a deterministic replay of a scripted interview. All analytics
             below are computed by the real backend engine from simulated events.
+            No Meet tab or camera required.
           </p>
         )}
       </CardContent>
