@@ -90,10 +90,12 @@ class ActivityKind(str, Enum):
     visibility_visible = "visibility_visible"
     mouse = "mouse"
     key = "key"
+    # Sustained dual-talk: interviewer mic + Meet tab audio both hot.
+    voice_overlap = "voice_overlap"
 
 
 class ActivityEvent(BaseModel):
-    """Browser focus / mouse / keyboard *metadata only* (never key contents)."""
+    """Browser activity metadata (focus/mouse/key timestamps, voice overlap)."""
 
     type: Literal["activity"] = "activity"
     ts: float

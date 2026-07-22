@@ -18,6 +18,7 @@ from . import speech_rate  # noqa: F401,E402
 from . import linguistics  # noqa: F401,E402
 from . import ownership  # noqa: F401,E402
 from . import gaze  # noqa: F401,E402
+from . import voice_overlap  # noqa: F401,E402
 
 __all__ = [
     "FeatureExtractor",

@@ -66,6 +66,10 @@ export function LiveStatus({
         <Stat label="Off-screen" value={Math.round(v.gaze_off_screen_pct ?? 0)} unit="%" />
         <Stat label="Looking down" value={Math.round(v.gaze_down_pct ?? 0)} unit="%" />
         <Stat
+          label="Voice overlap"
+          value={Math.round(v.voice_overlap_score ?? 0)}
+        />
+        <Stat
           label="Data collected"
           value={Math.round((state?.data_sufficiency ?? 0) * 100)}
           unit="%"

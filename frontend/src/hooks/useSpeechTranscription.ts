@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Speaker, TranscriptEvent } from "@/lib/types";
+import type { ActivityEvent, Speaker, TranscriptEvent } from "@/lib/types";
 import { nowSeconds } from "@/lib/utils";
 
-type Emit = (event: TranscriptEvent) => void;
+type Emit = (event: TranscriptEvent | ActivityEvent) => void;
+
+/** RMS above this on both mic and tab counts as "talking". */
+const ENERGY_HIGH = 0.02;
+/** Both sides must stay high this long before one overlap episode is emitted. */
+const OVERLAP_HOLD_S = 0.4;
 
 interface Options {
   micStream: MediaStream | null;
@@ -108,12 +113,38 @@ export function useSpeechTranscription({
     const tabAnalyser = makeAnalyser(ctx, displayStream);
     const buf = new Uint8Array(512);
     let raf = 0;
+    let overlapStart: number | null = null;
+    let overlapEmitted = false;
     const measure = () => {
       const mic = rms(micAnalyser, buf);
       const tab = rms(tabAnalyser, buf);
       // Smooth to avoid jitter.
       energyRef.current.mic = energyRef.current.mic * 0.7 + mic * 0.3;
       energyRef.current.tab = energyRef.current.tab * 0.7 + tab * 0.3;
+
+      // Voice overlap: both interviewer mic and Meet tab hot for ~0.4s.
+      const now = nowSeconds();
+      const bothHigh =
+        energyRef.current.mic > ENERGY_HIGH &&
+        energyRef.current.tab > ENERGY_HIGH;
+      if (bothHigh) {
+        if (overlapStart === null) overlapStart = now;
+        else if (
+          !overlapEmitted &&
+          now - overlapStart >= OVERLAP_HOLD_S
+        ) {
+          emitRef.current({
+            type: "activity",
+            ts: now,
+            kind: "voice_overlap",
+          });
+          overlapEmitted = true;
+        }
+      } else {
+        overlapStart = null;
+        overlapEmitted = false;
+      }
+
       setStatus((s) => ({
         ...s,
         micEnergy: energyRef.current.mic,

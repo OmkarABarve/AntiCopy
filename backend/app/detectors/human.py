@@ -256,3 +256,42 @@ class ThinkingPauseDetector:
                 detector=self.name,
             )
         ]
+
+
+@register_detector
+class VoiceClashDetector:
+    """Speech overlap as a modest post-interview human signal.
+
+    Counts accumulate live, but this detector only fires once
+    ``interview_finished`` is set (session stopped) so it does not move the
+    live risk score during the call.
+    """
+
+    name = "voice_clash"
+
+    def evaluate(self, features: FeatureSnapshot) -> list[Signal]:
+        v = features.values
+        if v.get("interview_finished", 0.0) < 1.0:
+            return []
+
+        count = v.get("voice_overlap_count", 0.0)
+        per_min = v.get("voice_overlap_per_min", 0.0)
+        # Need at least one clear overlap episode; strength stays modest.
+        strength = max(ramp(count, 1, 4), 0.7 * ramp(per_min, 0.2, 1.2))
+        if strength < 0.15:
+            return []
+        return [
+            _mk(
+                "voice_clash",
+                "Natural speech overlap",
+                weight=0.45,
+                confidence=min(0.85, strength),
+                explanation=(
+                    f"Detected {int(count)} voice-overlap episode(s) "
+                    f"({per_min:.1f}/min) where interviewer and candidate talked "
+                    "over each other. Pure AI-fed turn-taking rarely produces "
+                    "genuine interruptions. Applied only after the interview ends."
+                ),
+                detector=self.name,
+            )
+        ]

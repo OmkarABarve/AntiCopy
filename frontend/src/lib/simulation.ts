@@ -267,9 +267,34 @@ export function startSimulation(emit: Emit, profile: SimulationProfile): Simulat
   emit({ type: "control", action: "reset" });
   emit({ type: "control", action: "start" });
 
+  // Human demos get a couple of voice-overlap episodes mid-interview.
+  if (profile === "human") {
+    const lastDelay = timeline.length
+      ? timeline[timeline.length - 1].delayMs
+      : 5000;
+    for (const frac of [0.35, 0.62]) {
+      timeline.push({
+        delayMs: lastDelay * frac,
+        event: {
+          type: "activity",
+          ts: nowSeconds() + (lastDelay * frac) / 1000,
+          kind: "voice_overlap",
+        },
+      });
+    }
+    timeline.sort((a, b) => a.delayMs - b.delayMs);
+  }
+
   for (const { delayMs, event } of timeline) {
     timers.push(setTimeout(() => emit(event), delayMs));
   }
+
+  // Finish the session so post-interview signals (e.g. voice_clash) can apply.
+  const endMs =
+    (timeline.length ? timeline[timeline.length - 1].delayMs : 0) + 800;
+  timers.push(
+    setTimeout(() => emit({ type: "control", action: "stop" }), endMs),
+  );
 
   return {
     stop: () => {

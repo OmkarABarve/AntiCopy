@@ -33,7 +33,9 @@ export type ActivityKind =
   | "visibility_hidden"
   | "visibility_visible"
   | "mouse"
-  | "key";
+  | "key"
+  /** Sustained dual-talk: interviewer mic + Meet tab audio both hot. */
+  | "voice_overlap";
 
 export interface GazeEvent {
   type: "gaze";

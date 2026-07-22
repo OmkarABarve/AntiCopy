@@ -126,36 +126,51 @@ AntiCopy/
 - A Chromium browser (Chrome/Edge) for live capture (Web Speech API + screen/tab
   audio). The **simulation** demo works in any modern browser.
 
-### 1. Backend
+### One-command dev (recommended)
+
+First-time setup (backend venv + deps, then root + frontend npm):
 
 ```bash
+# Backend (once)
 cd backend
 python -m venv .venv
 # Windows PowerShell:
 .\.venv\Scripts\Activate.ps1
-# macOS/Linux:
-# source .venv/bin/activate
-
+# macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm   # NLP model (recommended)
+cd ..
 
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+# Install root + frontend deps (once)
+npm run install:all
 ```
 
-Verify: open http://127.0.0.1:8000/health and http://127.0.0.1:8000/docs .
-
-> spaCy is optional. If the model isn't installed, the linguistics extractor
-> degrades gracefully to a built-in tokenizer, so the app still runs.
-
-### 2. Frontend
+Then from the **repo root** start both servers together:
 
 ```bash
-cd frontend
-npm install
 npm run dev
 ```
 
-Open http://localhost:3000 .
+- Frontend: http://localhost:3000  
+- Backend:  http://127.0.0.1:8000  (health: `/health`, docs: `/docs`)
+
+This runs FastAPI (uvicorn with reload) and Next.js side by side via
+`concurrently`. Ctrl+C stops both.
+
+### Run separately (optional)
+
+```bash
+# Backend only
+npm run dev:backend
+# or: cd backend && .venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+
+# Frontend only
+npm run dev:frontend
+# or: cd frontend && npm run dev
+```
+
+> spaCy is optional. If the model isn't installed, the linguistics extractor
+> degrades gracefully to a built-in tokenizer, so the app still runs.
 
 ---
 
