@@ -29,15 +29,21 @@ function makeSessionId(): string {
  * capture. This is the single seam the monitoring console talks to.
  */
 export function useMonitorController() {
-  const [sessionId] = useState(makeSessionId);
+  // Stable empty on SSR + first client paint; assign a random id after mount
+  // so the dashboard link doesn't hydrate-mismatch.
+  const [sessionId, setSessionId] = useState("");
   const [mode, setMode] = useState<MonitorMode>("idle");
+
+  useEffect(() => {
+    setSessionId(makeSessionId());
+  }, []);
 
   const capture = useMediaCapture();
   const simRef = useRef<SimulationHandle | null>(null);
 
   const socket = useMonitorSocket({
-    sessionId,
-    enabled: mode !== "idle",
+    sessionId: sessionId || "pending",
+    enabled: mode !== "idle" && !!sessionId,
   });
   const sendRef = useRef(socket.send);
   useEffect(() => {

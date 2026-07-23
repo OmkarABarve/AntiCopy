@@ -1,0 +1,9 @@
+{
+  "name": "anticopy-backend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AntiCopy FastAPI backend — run with npm run dev from this folder",
+  "scripts": {
+    "dev": "node ../scripts/run-backend.mjs"
+  }
+}

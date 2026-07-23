@@ -13,9 +13,17 @@ export function LiveTranscript({
   transcript: TranscriptSegment[];
   interim?: string;
 }) {
-  const endRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const el = containerRef.current;
+    if (!el) return;
+    // Only keep pinned to bottom if the user is already near the bottom.
+    // Never use scrollIntoView — it scrolls the whole page.
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 96) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [transcript.length, interim]);
 
   return (
@@ -25,7 +33,10 @@ export function LiveTranscript({
           <MessageSquare className="size-4 text-muted-foreground" /> Live Transcript
         </CardTitle>
       </CardHeader>
-      <CardContent className="scroll-thin flex-1 space-y-3 overflow-y-auto pr-3">
+      <CardContent
+        ref={containerRef}
+        className="scroll-thin flex-1 space-y-3 overflow-y-auto pr-3"
+      >
         {transcript.length === 0 && !interim && (
           <p className="text-xs text-muted-foreground">
             Transcript will appear as the conversation is detected...
@@ -64,7 +75,6 @@ export function LiveTranscript({
             </div>
           </div>
         )}
-        <div ref={endRef} />
       </CardContent>
     </Card>
   );

@@ -35,8 +35,7 @@ function blendshape(
 /**
  * Pick the best candidate face among all detected faces. In a Google Meet grid
  * the candidate is usually the largest/most-centered face (especially when
- * pinned or spotlighted), so we score by bounding-box area with a centeredness
- * tiebreak rather than taking an arbitrary first face.
+ * pinned or spotlighted).
  */
 function pickCandidateFace(faces: { x: number; y: number }[][]): number {
   let bestIdx = 0;
@@ -66,22 +65,49 @@ function pickCandidateFace(faces: { x: number; y: number }[][]): number {
   return bestIdx;
 }
 
+async function createLandmarker(
+  vision: typeof import("@mediapipe/tasks-vision"),
+  fileset: Awaited<
+    ReturnType<typeof import("@mediapipe/tasks-vision").FilesetResolver.forVisionTasks>
+  >,
+) {
+  // Prefer CPU — GPU/WebGL with Meet tab capture is a common crash source, and
+  // Next.js also surfaces MediaPipe's GPU→CPU fallback INFO logs as "errors".
+  try {
+    return await vision.FaceLandmarker.createFromOptions(fileset, {
+      baseOptions: {
+        modelAssetPath: FACE_LANDMARKER_MODEL,
+        delegate: "CPU",
+      },
+      runningMode: "VIDEO",
+      numFaces: 3,
+      outputFaceBlendshapes: true,
+      outputFacialTransformationMatrixes: false,
+    });
+  } catch {
+    return await vision.FaceLandmarker.createFromOptions(fileset, {
+      baseOptions: {
+        modelAssetPath: FACE_LANDMARKER_MODEL,
+        delegate: "GPU",
+      },
+      runningMode: "VIDEO",
+      numFaces: 3,
+      outputFaceBlendshapes: true,
+      outputFacialTransformationMatrixes: false,
+    });
+  }
+}
+
 /**
  * Runs MediaPipe Face Landmarker on the candidate's Google Meet video (from
- * getDisplayMedia tab capture) in the browser via WASM (zero install) and emits
- * normalized gaze/blink samples. Gaze is derived from eye-look blendshapes;
- * blinks from eyeBlink blendshapes. Downward gaze (gaze_y > 0) flags a
- * candidate reading notes / a second screen during a remote call.
- *
- * Uses an internal hidden <video> so analysis does not depend on the UI
- * preview being mounted. An optional preview element can mirror the same stream
- * via registerVideo.
- *
- * Eye tracking is intentionally supporting-only evidence downstream.
+ * getDisplayMedia tab capture). Emits normalized gaze/blink samples.
  */
-export function useFaceLandmarker({ stream, enabled, emit, hz = 8 }: Options) {
+export function useFaceLandmarker({ stream, enabled, emit, hz = 5 }: Options) {
   const analysisVideoRef = useRef<HTMLVideoElement | null>(null);
   const previewRef = useRef<HTMLVideoElement | null>(null);
+  const landmarkerRef = useRef<import("@mediapipe/tasks-vision").FaceLandmarker | null>(
+    null,
+  );
   const registerVideo = useCallback((el: HTMLVideoElement | null) => {
     previewRef.current = el;
     if (el && analysisVideoRef.current?.srcObject) {
@@ -117,26 +143,30 @@ export function useFaceLandmarker({ stream, enabled, emit, hz = 8 }: Options) {
       return;
     }
 
-    let landmarker: import("@mediapipe/tasks-vision").FaceLandmarker | null = null;
-    let raf = 0;
     let cancelled = false;
+    let raf = 0;
     let lastEmit = 0;
+    let lastTs = 0;
+    let lastStatusAt = 0;
     const minInterval = 1 / hz;
 
-    // Internal offscreen video - landmarker never depends on the UI preview.
     let video = analysisVideoRef.current;
     if (!video) {
       video = document.createElement("video");
       video.muted = true;
       video.playsInline = true;
+      video.autoplay = true;
       video.setAttribute("playsinline", "true");
+      video.setAttribute("muted", "true");
+      // Keep a real pixel size — 1×1 can make MediaPipe fail on some GPUs.
       video.style.position = "fixed";
-      video.style.width = "1px";
-      video.style.height = "1px";
+      video.style.width = "320px";
+      video.style.height = "180px";
       video.style.opacity = "0";
       video.style.pointerEvents = "none";
       video.style.bottom = "0";
       video.style.right = "0";
+      video.style.zIndex = "-1";
       document.body.appendChild(video);
       analysisVideoRef.current = video;
     }
@@ -146,31 +176,61 @@ export function useFaceLandmarker({ stream, enabled, emit, hz = 8 }: Options) {
       previewRef.current.play().catch(() => undefined);
     }
 
+    const waitForFrame = (): Promise<boolean> =>
+      new Promise((resolve) => {
+        const start = performance.now();
+        const tick = () => {
+          if (cancelled) {
+            resolve(false);
+            return;
+          }
+          if (video && video.readyState >= 2 && video.videoWidth > 0) {
+            resolve(true);
+            return;
+          }
+          if (performance.now() - start > 8000) {
+            resolve(false);
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
+
     const setup = async () => {
       setStatus((s) => ({
         ...s,
         loading: true,
         error: null,
         hasVideo: true,
+        ready: false,
       }));
       try {
         const vision = await import("@mediapipe/tasks-vision");
         const fileset = await vision.FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
-        landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
-          baseOptions: {
-            modelAssetPath: FACE_LANDMARKER_MODEL,
-            delegate: "GPU",
-          },
-          runningMode: "VIDEO",
-          numFaces: 3, // Meet may show several tiles; we select the candidate.
-          outputFaceBlendshapes: true,
-          outputFacialTransformationMatrixes: false,
-        });
+        const landmarker = await createLandmarker(vision, fileset);
+        if (cancelled) {
+          landmarker.close();
+          return;
+        }
+        landmarkerRef.current = landmarker;
+
         await video!.play().catch(() => undefined);
+        const ready = await waitForFrame();
         if (cancelled) return;
+        if (!ready) {
+          setStatus((s) => ({
+            ...s,
+            loading: false,
+            error: "Meet video has no frames yet — pin the candidate and retry",
+          }));
+          return;
+        }
+
         setStatus((s) => ({ ...s, ready: true, loading: false, hasVideo: true }));
         loop();
       } catch (e) {
+        if (cancelled) return;
         setStatus((s) => ({
           ...s,
           loading: false,
@@ -180,21 +240,41 @@ export function useFaceLandmarker({ stream, enabled, emit, hz = 8 }: Options) {
       }
     };
 
-    const loop = () => {
-      if (cancelled || !landmarker || !video) return;
-      raf = requestAnimationFrame(loop);
-      if (video.readyState < 2) return;
+    const publishStatus = (patch: Partial<FaceLandmarkerStatus>, force = false) => {
+      const t = performance.now();
+      if (!force && t - lastStatusAt < 250) return;
+      lastStatusAt = t;
+      setStatus((s) => ({ ...s, ...patch }));
+    };
 
-      const now = nowSeconds();
-      if (now - lastEmit < minInterval) return;
+    const loop = () => {
+      if (cancelled) return;
+      raf = requestAnimationFrame(loop);
+
+      const landmarker = landmarkerRef.current;
+      if (!landmarker || !video) return;
+      if (video.readyState < 2 || video.videoWidth < 2 || video.videoHeight < 2) {
+        return;
+      }
+      // Track ended / muted (user stopped sharing).
+      const track = (video.srcObject as MediaStream | null)?.getVideoTracks()?.[0];
+      if (track && track.readyState !== "live") return;
+
+      const wall = nowSeconds();
+      if (wall - lastEmit < minInterval) return;
+
+      // MediaPipe VIDEO mode requires strictly increasing timestamps (ms).
+      const ts = Math.max(performance.now(), lastTs + 1);
+      lastTs = ts;
 
       let result;
       try {
-        result = landmarker.detectForVideo(video, performance.now());
+        result = landmarker.detectForVideo(video, ts);
       } catch {
+        // Swallow WASM/frame errors; keep the loop alive for the next frame.
         return;
       }
-      lastEmit = now;
+      lastEmit = wall;
 
       const faces = result.faceLandmarks ?? [];
       const faceVisible =
@@ -203,7 +283,7 @@ export function useFaceLandmarker({ stream, enabled, emit, hz = 8 }: Options) {
       if (!faceVisible) {
         const ev: GazeEvent = {
           type: "gaze",
-          ts: now,
+          ts: wall,
           face_visible: false,
           on_screen: false,
           blink: false,
@@ -211,13 +291,14 @@ export function useFaceLandmarker({ stream, enabled, emit, hz = 8 }: Options) {
           gaze_y: 0,
         };
         emitRef.current(ev);
-        setStatus((s) => ({ ...s, faceVisible: false, lastGaze: ev }));
+        publishStatus({ faceVisible: false, lastGaze: ev });
         return;
       }
 
-      // Choose the candidate face (largest / most centered in the Meet frame).
       const idx = pickCandidateFace(faces);
       const cats = result.faceBlendshapes![idx]?.categories ?? [];
+      if (!cats.length) return;
+
       const blink =
         (blendshape(cats, "eyeBlinkLeft") + blendshape(cats, "eyeBlinkRight")) /
           2 >
@@ -239,12 +320,16 @@ export function useFaceLandmarker({ stream, enabled, emit, hz = 8 }: Options) {
 
       const gaze_x = clamp((rightAmount - leftAmount) * 1.6, -1, 1);
       const gaze_y = clamp((downAmount - upAmount) * 1.6, -1, 1);
-      // Looking clearly down (notes / second screen) is off-camera engagement.
-      const on_screen = Math.abs(gaze_x) < 0.55 && gaze_y < 0.35;
+      // "On screen" = engaged with the *display*, not looking into the webcam.
+      // Laptop cams sit above the Meet window, so mild/moderate downward gaze
+      // (watching the call) is still on-screen. Off-screen = strong side look
+      // (second monitor) or extreme down (notes below the display).
+      const on_screen =
+        Math.abs(gaze_x) < 0.65 && gaze_y > -0.5 && gaze_y < 0.7;
 
       const ev: GazeEvent = {
         type: "gaze",
-        ts: now,
+        ts: wall,
         face_visible: true,
         on_screen,
         blink,
@@ -256,7 +341,7 @@ export function useFaceLandmarker({ stream, enabled, emit, hz = 8 }: Options) {
         gaze_y: Number(gaze_y.toFixed(3)),
       };
       emitRef.current(ev);
-      setStatus((s) => ({ ...s, faceVisible: true, lastGaze: ev }));
+      publishStatus({ faceVisible: true, lastGaze: ev });
     };
 
     setup();
@@ -264,17 +349,17 @@ export function useFaceLandmarker({ stream, enabled, emit, hz = 8 }: Options) {
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
-      landmarker?.close();
-      if (video) {
-        video.srcObject = null;
+      try {
+        landmarkerRef.current?.close();
+      } catch {
+        /* ignore */
       }
-      if (previewRef.current) {
-        previewRef.current.srcObject = null;
-      }
+      landmarkerRef.current = null;
+      if (video) video.srcObject = null;
+      if (previewRef.current) previewRef.current.srcObject = null;
     };
   }, [enabled, stream, hz]);
 
-  // Tear down the hidden analysis video on unmount.
   useEffect(() => {
     return () => {
       const video = analysisVideoRef.current;

@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "AntiCopy — run frontend and backend together",
   "scripts": {
-    "dev": "concurrently -k -n backend,frontend -c cyan,magenta \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "node scripts/dev.mjs",
     "dev:backend": "node scripts/run-backend.mjs",
     "dev:frontend": "npm --prefix frontend run dev",
     "install:all": "npm install && npm --prefix frontend install"

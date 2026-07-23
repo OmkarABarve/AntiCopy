@@ -123,8 +123,8 @@ export function ControlPanel({ controller }: { controller: MonitorController }) 
                   ? "blocked - share the Meet tab"
                   : face.status.ready
                     ? face.status.faceVisible
-                      ? face.status.lastGaze && face.status.lastGaze.gaze_y > 0.35
-                        ? "tracking · looking down"
+                      ? face.status.lastGaze && face.status.lastGaze.gaze_y > 0.55
+                        ? "tracking · looking far down"
                         : "tracking candidate face"
                       : "no face detected - pin/spotlight the candidate"
                     : face.status.loading
@@ -133,16 +133,22 @@ export function ControlPanel({ controller }: { controller: MonitorController }) 
               </div>
               <div>
                 Speech:{" "}
-                {speech.status.supported
-                  ? speech.status.listening
-                    ? "listening"
-                    : "starting…"
-                  : "not supported (use Chrome/Edge or Demo mode)"}
+                {!speech.status.supported
+                  ? "not supported (use Chrome/Edge or Demo mode)"
+                  : speech.status.error
+                    ? `error — ${speech.status.error}`
+                    : speech.status.listening
+                      ? speech.status.hasTabAudio
+                        ? "listening (mic + Meet tab audio)"
+                        : "listening (mic only — re-share Meet with tab audio)"
+                      : "starting…"}
               </div>
               <div>
                 Tip: pin or spotlight the candidate in Meet so their face is the
-                largest tile, and enable &quot;Also share tab audio&quot; for
-                candidate transcription. Gaze uses the Meet tab, not your webcam.
+                largest tile, and enable &quot;Also share tab audio&quot;. Web
+                Speech hears your microphone; candidate lines are attributed when
+                Meet tab audio is louder. Gaze uses the Meet tab video, not your
+                webcam.
               </div>
             </div>
           </div>

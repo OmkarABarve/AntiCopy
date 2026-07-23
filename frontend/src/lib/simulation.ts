@@ -230,13 +230,14 @@ function buildGaze(
       const phase = (i % (hz * 2)) / (hz * 2); // 2s reading cycle
       gaze_x = 0.15 + phase * 0.55; // sweep rightward
       if (phase > 0.92) gaze_x = 0.1; // line reset
-      gaze_y = 0.45 + Math.sin(i / 6) * 0.06; // sustained downward attention
-      on_screen = gaze_x < 0.45 && gaze_y < 0.35;
+      gaze_y = 0.55 + Math.sin(i / 6) * 0.08; // often below-display / notes
+      // Off-screen via horizontal sweep (second-monitor style), not mild down.
+      on_screen = Math.abs(gaze_x) < 0.5 && gaze_y < 0.7;
     } else {
-      // Natural: centered gaze with organic jitter, mostly on-camera.
+      // Natural: watching the Meet window (slightly below cam is still on-screen).
       gaze_x = Math.sin(i / 9) * 0.18 + (Math.random() - 0.5) * 0.12;
-      gaze_y = Math.cos(i / 11) * 0.12 + (Math.random() - 0.5) * 0.1;
-      on_screen = Math.abs(gaze_x) < 0.5 && gaze_y < 0.35;
+      gaze_y = 0.25 + Math.cos(i / 11) * 0.1 + (Math.random() - 0.5) * 0.08;
+      on_screen = Math.abs(gaze_x) < 0.65 && gaze_y > -0.5 && gaze_y < 0.7;
     }
 
     out.push({

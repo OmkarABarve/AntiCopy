@@ -59,11 +59,29 @@ That starts backend + frontend together:
 
 Open http://localhost:3000 and click **Demo: AI-Assisted** or **Demo: Human** for an instant walkthrough (no Meet required). Ctrl+C stops both servers.
 
-After the first setup, day-to-day is just:
+### Run separately (two terminals)
 
 ```bash
-# activate backend/.venv if you need to reinstall Python deps, then:
+# Terminal 1 — backend only
+cd backend
 npm run dev
+
+# Terminal 2 — frontend only
+cd frontend
+npm run dev
+```
+
+After the first setup, day-to-day from the root is just:
+
+```bash
+npm run dev
+```
+
+If root `npm run dev` says a port is in use, free it first:
+
+```bash
+netstat -ano | findstr ":8000 :3000"
+taskkill /PID <pid> /F
 ```
 
 ---

@@ -18,8 +18,10 @@ from .base import register_extractor, safe_mean, safe_std
 HEATMAP_COLS = 12
 HEATMAP_ROWS = 8
 
-# gaze_y is down-positive; above this the candidate is looking clearly downward.
-DOWN_THRESHOLD = 0.35
+# gaze_y is down-positive. Looking at a Meet window below the webcam is typically
+# mild downward (~0.2–0.5) and should NOT count as "reading notes". Only clearly
+# extreme downward gaze (below the display) feeds the downward-notes features.
+DOWN_THRESHOLD = 0.55
 
 
 @register_extractor

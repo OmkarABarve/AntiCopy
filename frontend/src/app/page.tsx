@@ -23,8 +23,11 @@ export default function Home() {
     <main className="mx-auto max-w-[1600px] px-4 py-6 lg:px-8">
       <div className="flex items-start justify-between">
         <AppHeader />
-        <Link href={`/dashboard?session=${sessionId}`} target="_blank">
-          <Button variant="outline" size="sm">
+        <Link
+          href={sessionId ? `/dashboard?session=${sessionId}` : "/dashboard"}
+          target="_blank"
+        >
+          <Button variant="outline" size="sm" disabled={!sessionId}>
             <ExternalLink /> Open reviewer dashboard
           </Button>
         </Link>

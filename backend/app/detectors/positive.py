@@ -77,7 +77,7 @@ class GazeReadingDetector:
                 _mk(
                     "reading_like_gaze",
                     "Reading-like gaze pattern",
-                    weight=0.4,  # low - eye tracking is never sole evidence
+                    weight=0.4,  # unchanged — more specific than generic off-screen
                     confidence=strength * data,
                     explanation=(
                         "Eye movement shows rhythmic left-to-right sweeps with line "
@@ -88,22 +88,25 @@ class GazeReadingDetector:
                 )
             )
 
+        # Softened: slight off-axis / fixed gaze is normal on Meet (watching the
+        # other person on-screen, thinking). Only clearly elevated rates fire,
+        # and at a lower weight than reading-like scan.
         off_screen = v.get("gaze_off_screen_pct", 0.0)
         fixed = v.get("gaze_fixed_region_score", 0.0)
-        off_strength = ramp(off_screen, 25, 60)
-        combined = max(off_strength, ramp(fixed, 0.4, 0.8))
-        if combined * data >= 0.15:
+        off_strength = ramp(off_screen, 45, 75)
+        combined = max(off_strength, ramp(fixed, 0.55, 0.9))
+        if combined * data >= 0.2:
             out.append(
                 _mk(
                     "off_screen_attention",
                     "High off-screen / fixed-region attention",
-                    weight=0.45,
-                    confidence=combined * data,
+                    weight=0.28,
+                    confidence=combined * data * 0.85,
                     explanation=(
-                        f"On the Meet video, attention is off the candidate's "
-                        f"forward-facing region {off_screen:.0f}% of the time, "
-                        "often toward a fixed region. Could indicate a second "
-                        "screen or notes; corroborate with conversation signals."
+                        f"On the Meet video, gaze is away from the display region "
+                        f"{off_screen:.0f}% of the time (strong side-look or extreme "
+                        "down). Watching the call below the webcam is treated as "
+                        "on-screen. Supporting evidence only."
                     ),
                     detector=self.name,
                 )
@@ -124,20 +127,21 @@ class DownwardGazeDetector:
 
         down_pct = v.get("gaze_down_pct", 0.0)
         sustained = v.get("gaze_down_sustained_s", 0.0)
-        strength = max(ramp(down_pct, 25, 60), 0.7 * ramp(sustained, 3, 10))
-        if strength * data < 0.15:
+        # Higher bar — glancing down while thinking is common.
+        strength = max(ramp(down_pct, 40, 70), 0.7 * ramp(sustained, 5, 14))
+        if strength * data < 0.2:
             return []
         return [
             _mk(
                 "downward_gaze",
                 "Sustained downward gaze",
-                weight=0.45,  # low - eye tracking is supporting-only evidence
-                confidence=strength * data,
+                weight=0.3,
+                confidence=strength * data * 0.9,
                 explanation=(
                     f"On the Meet video the candidate looks downward {down_pct:.0f}% of "
-                    f"the time (longest stretch ~{sustained:.0f}s), consistent with "
-                    "reading notes or a second screen. Supporting evidence only - "
-                    "corroborate with conversation signals."
+                    f"the time (longest stretch ~{sustained:.0f}s). Brief downward "
+                    "glances are normal; this flags sustained patterns. Supporting "
+                    "evidence only — corroborate with conversation signals."
                 ),
                 detector=self.name,
             )
